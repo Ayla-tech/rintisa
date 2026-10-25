@@ -24,52 +24,21 @@ import { S, SK, BD } from "../state.js";
 import { R } from "../router.js";
 import { img } from "./coop.js";
 
-export const tj = (k, v) => {
-  const a = S.jf[k],
-    m = k === "bd" ? 2 : 4,
-    i = a.indexOf(v);
-  if (i >= 0) a.splice(i, 1);
-  else if (a.length >= m) return toast("Maksimal " + m + " pilihan.");
-  else a.push(v);
-  R();
-};
-const jc = (k, L) =>
-  `<div class="flex flex-wrap gap-2">${L.map((v) => `<button type="button" class="inline-flex min-h-10 items-center rounded-full border px-4 py-2 text-sm font-semibold transition ${S.jf[k].includes(v) ? "border-pri bg-pri text-onpri" : "border-line bg-card text-ink hover:border-pri"}" onclick='tj("${k}",${JSON.stringify(v)})'>${v}</button>`).join("")}</div>`;
-const jobForm = () => {
-  const f = S.jf;
-  return `<div class="${C}">${CH("plus", "Pasang pekerjaan")}
-<label class="${LB}">Judul (min. 5 karakter)</label><input class="${IN}" value="${esc(f.t)}" oninput="S.jf.t=this.value">
-<label class="${LB}">Bidang (pilih 1 sampai 2)</label>${jc("bd", BD)}<label class="${LB}">Kemampuan dibutuhkan (sampai 4)</label>${jc("s", SK)}
-<label class="${LB}">Deskripsi (min. 30 karakter)</label><textarea class="${IN} min-h-[96px]" oninput="S.jf.x=this.value">${esc(f.x)}</textarea>
-<label class="${LB}">Hasil akhir yang diharapkan</label><textarea class="${IN} min-h-[72px]" oninput="S.jf.dv=this.value">${esc(f.dv)}</textarea>
-<label class="${LB}">Level pekerja minimum</label><select class="${IN}" onchange="S.jf.lv=this.value">${["Semua level", "Pemula ke atas", "Sudah sering praktik"].map((x) => `<option${x === f.lv ? " selected" : ""}>${x}</option>`).join("")}</select>
-<label class="${LB}">Honor (Rp 15.000 – 300.000)</label><input type="number" class="${IN}" value="${f.b}" oninput="S.jf.b=+this.value">
-<label class="${LB}">Tenggat (1–60 hari)</label><input type="number" class="${IN}" value="${f.d}" oninput="S.jf.d=+this.value">
-<label class="${LB}">Maksimal revisi (0–5)</label><input type="number" class="${IN}" value="${f.r}" oninput="S.jf.r=+this.value">
-<button class="${BY} mt-4 w-full" onclick="postJob()">Pasang pekerjaan</button></div>`;
-};
-
 const sec = (i, t, b) => (b ? `<div class="${C}">${CH(i, t)}${b}</div>` : "");
-const txt = (t) =>
-  t
-    ? `<p class="whitespace-pre-line text-sm leading-relaxed">${esc(t)}</p>`
-    : "";
-const sub = (t, v) =>
-  v ? `<p class="${MU} mt-3 first:mt-0">${t}</p>${txt(v)}` : "";
+const txt = (t) => (t ? `<p class="whitespace-pre-line text-sm leading-relaxed">${esc(t)}</p>` : "");
+const sub = (t, v) => (v ? `<p class="${MU} mt-3 first:mt-0">${t}</p>${txt(v)}` : "");
 const stat = (a, b) =>
   `<div class="rounded-xl bg-soft p-3 text-center"><b class="block text-sm text-ink">${a}</b><span class="text-[11px] text-mut">${b}</span></div>`;
-const head = (
-  r,
-  chips,
-  stats,
-) => `<div class="mb-4 overflow-hidden rounded-2xl bg-card shadow-card ring-1 ring-line"><div class="dots h-28 bg-gradient-to-br from-navy via-[#17406a] to-navy2"></div><div class="px-5 pb-5"><div class="-mt-10 w-fit rounded-3xl border-4 border-card">${AV(r.name, "h-20 w-20 text-3xl rounded-[1.25rem]")}</div>
-<h2 class="mt-3 text-2xl font-extrabold tracking-tight text-ink">${esc(r.name)}</h2><div class="mt-2 flex flex-wrap gap-2">${chips
-  .filter(Boolean)
-  .map((c) => `<span class="${PL}">${esc(c)}</span>`)
-  .join(
-    "",
-  )}${IDB(r.id_status)}</div>${stats ? `<div class="mt-4 grid grid-cols-3 gap-2">${stats}</div>` : ""}</div></div>`;
+const head = (r, chips, stats) => `<div class="mb-4 overflow-hidden rounded-2xl bg-card shadow-card ring-1 ring-line"><div class="relative h-28 bg-gradient-to-br from-navy via-[#17406a] to-navy2"><div class="dots absolute inset-0"></div></div><div class="px-5 pb-5"><div class="relative -mt-10 w-fit rounded-3xl border-4 border-card">${AV(r.name, "h-20 w-20 text-3xl rounded-[1.25rem]")}</div>
+<h2 class="mt-3 text-2xl font-extrabold tracking-tight text-ink">${esc(r.name)}</h2><div class="mt-2 flex flex-wrap gap-2">${chips.filter(Boolean).map((c) => `<span class="${PL}">${esc(c)}</span>`).join("")}${IDB(r.id_status)}</div>${stats ? `<div class="mt-4 grid grid-cols-3 gap-2">${stats}</div>` : ""}</div></div>`;
 
+/* Tampilan profil = isi formulir registrasi, urut per langkah dan memakai label yang sama.
+   Isian yang kosong tetap tampil sebagai "Belum diisi" supaya terlihat 1:1. */
+const em = '<span class="font-normal text-mut">Belum diisi</span>';
+const row = (a, v) => KV(a, v ? esc(v) : em);
+const long = (a, v) => `<p class="${MU} mt-4 first:mt-0">${a}</p>${v ? txt(v) : `<p class="text-sm text-mut">Belum diisi</p>`}`;
+const lnk = (v) =>
+  !v ? `<p class="text-sm text-mut">Belum diisi</p>` : /^https?:\/\/\S+$/i.test(v.trim()) ? `<a class="break-all text-sm font-semibold text-pri underline" href="${esc(v.trim())}" target="_blank" rel="noopener noreferrer">${esc(v.trim())}</a>` : txt(v);
 const wView = (r) =>
   head(
     r,
@@ -78,56 +47,39 @@ const wView = (r) =>
       stat(esc(r.jam || 0) + " jam", "per minggu") +
       stat(rp(r.min_pay || 0), "minimum"),
   ) +
-  sec("user", "Tentang saya", txt(r.bio)) +
-  sec(
-    "target",
-    "Kemampuan",
-    `<div class="mb-2 flex flex-wrap gap-2">${(r.skills || []).map((k) => `<span class="${PL}">${esc(k)}</span>`).join("")}</div>` +
-      KV("Tools", esc(r.tools || "-")) +
-      KV("Bahasa", esc(r.langs || "-")),
+  sec("user", "Tentang kamu",
+    row("Nama lengkap", r.name) + row("Kota domisili", r.kota) + row("Status saat ini", r.status_now) + row("Pendidikan terakhir", r.edu_level) +
+      row("Asal sekolah, kampus, atau tempat belajar", r.school) + row("Jurusan atau bidang studi", r.major) + (r.grad_year ? row("Tahun lulus", String(r.grad_year)) : "") +
+      long("Ringkasan diri", r.bio),
   ) +
-  sec(
-    "chat",
-    "Jawaban kasus: klien minta ganti warna 3 kali",
-    r.tes
-      ? `<div class="rounded-2xl bg-soft p-4 text-sm italic leading-relaxed">“${esc(r.tes)}”</div>`
-      : "",
+  sec("target", "Kemampuan",
+    row("Bidang utama", r.bidang) + row("Level saat ini", r.lv) +
+      `<p class="${MU} mt-4">Kemampuan yang bisa dikerjakan</p><div class="mt-1 flex flex-wrap gap-2">${(r.skills || []).map((k) => `<span class="${PL}">${esc(k)}</span>`).join("") || `<span class="text-sm text-mut">Belum diisi</span>`}</div>` +
+      `<div class="mt-3">${row("Tools yang dikuasai", r.tools)}${row("Bahasa", r.langs)}</div>`,
   ) +
-  sec(
-    "trend",
-    "Kesiapan belajar",
-    sub("Sedang belajar atau pernah dicoba", r.task) +
-      sub("Kegiatan yang melatih kemampuan", r.org) +
-      sub("Hasil latihan", r.links),
+  sec("trend", "Kesiapan belajar",
+    long("Sedang belajar atau pernah mencoba apa?", r.task) +
+      long("Kegiatan lain yang melatih kemampuan", r.org) +
+      `<p class="${MU} mt-4">Tautan hasil latihan</p>${lnk(r.links)}`,
   ) +
-  sec(
-    "clock",
-    "Cara kerja",
-    KV("Waktu per tugas kecil", esc(r.speed)) +
-      KV("Saat brief kurang jelas", esc(r.gaya)) +
-      KV("Waktu luang", esc(r.hari)) +
-      sub("Kenapa di Rintisa", r.why),
+  sec("clock", "Cara kerja",
+    row("Waktu menyelesaikan satu tugas kecil", r.speed) + row("Kalau brief kurang jelas", r.gaya) +
+      long("Jawaban kasus: klien minta ganti warna 3 kali", r.tes) +
+      long("Alasan memilih pekerjaan di Rintisa", r.why),
   ) +
-  sec(
-    "cap",
-    "Latar belakang",
-    r.edu_level || r.status_now
-      ? KV("Status", esc(r.status_now || "-")) +
-          KV("Pendidikan terakhir", esc(r.edu_level || "-")) +
-          (r.school ? KV("Asal belajar", esc(r.school)) : "") +
-          (r.major ? KV("Jurusan / bidang studi", esc(r.major)) : "")
-      : "",
+  sec("calendar", "Ketersediaan",
+    row("Jam kerja per minggu", r.jam ? r.jam + " jam" : "") + row("Waktu paling luang", r.hari) + row("Bayaran minimum per proyek", r.min_pay ? rp(r.min_pay) : ""),
   );
 
 const eView = (r) =>
   head(r, [r.jenis, r.kota], "") +
-  sec("store", "Tentang usaha", txt(r.about)) +
-  sec(
-    "target",
-    "Kebutuhan",
-    txt(r.need) + KV("Kisaran honor", esc(r.budget || "-")),
+  sec("store", "Tentang usaha",
+    row("Nama usaha atau organisasi", r.name) + row("Jenis", r.jenis) + row("Kota", r.kota) + long("Tentang usaha", r.about),
   ) +
-  sec("link", "Tautan", txt(r.links));
+  sec("target", "Kebutuhan",
+    long("Biasanya butuh bantuan apa?", r.need) + `<div class="mt-3">${row("Kisaran honor per proyek", r.budget)}</div>`,
+  ) +
+  sec("link", "Tautan", lnk(r.links));
 
 export const vProf = () => {
   const p = S.pv;
@@ -163,8 +115,7 @@ const done = (w) => {
 };
 
 const porto = () =>
-  sec(
-    "folder",
+  sec("folder",
     "Karya di Rintisa",
     S.nt
       .filter((n) => n.st === "completed")
@@ -182,8 +133,7 @@ export function vMe() {
     return (
       eView({ ...e, id_status: e.ids }) +
       idCard(e.ids) +
-      `<div class="${C}">${CH("briefcase", "Pekerjaan saya")}${S.myJobs.map((j) => `<p class="${MU} mt-1">• ${esc(j.t)} · ${rp(j.b)}</p>`).join("") || `<p class="${MU}">Belum ada. Pasang satu di bawah supaya talenta bisa dicocokkan.</p>`}</div>` +
-      jobForm() +
+      `<div class="${C}">${CH("briefcase", "Pekerjaan saya")}<p class="${MU}">${S.myJobs.length} dibuka, ${S.allJobs.length - S.myJobs.length} ditutup.</p><button class="${BY} mt-3 w-full" onclick="S.tab='jobs';S.view='main';R();scrollTo(0,0)">Kelola pekerjaan${ico("arrow", "h-4 w-4")}</button></div>` +
       `<div class="flex gap-2"><button class="${BO}" onclick="S.ob.employer=0;S.scr='onb';R()">${ico("pen", "h-4 w-4")}Ubah profil</button><button class="${BR}" onclick="logout()">${ico("logout", "h-4 w-4")}Keluar</button></div>`
     );
   }

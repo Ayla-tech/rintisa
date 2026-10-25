@@ -1,7 +1,7 @@
 import { sb } from "./supabase.js";
 import { $, toast } from "./ui.js";
 import { S } from "./state.js";
-import { pct, pctW } from "./matching.js";
+import { pct, pctW, pctWJ } from "./matching.js";
 import { R } from "./router.js";
 
 const q = async (p) => {
@@ -22,6 +22,8 @@ const mJob = (r) => ({
   bd: r.bidang || [],
   dv: r.deliverables || "",
   lv: r.level_needed,
+  st: r.status,
+  at: r.created_at,
 });
 const mWorker = (r) => ({
   id: r.user_id,
@@ -33,9 +35,18 @@ const mWorker = (r) => ({
   x: r.bio || r.org || r.task || "-",
   r,
 });
+let FU = {}; /* path lampiran -> tautan unduh bertanda tangan */
 const mMsg = (x) => ({
   f: x.is_system ? "sys" : x.sender_id === S.me ? "me" : "o",
   t: x.body,
+  file: x.file_path
+    ? {
+        n: x.file_name || "berkas",
+        s: x.file_size || 0,
+        t: x.file_type || "",
+        u: FU[x.file_path] || "",
+      }
+    : null,
 });
 const fmt = (t) =>
   new Date(t).toLocaleString("id-ID", {
@@ -63,6 +74,7 @@ const mNt = (m, ms, lg) => {
     pid: w ? m.job.employer_id : m.worker_id,
     pct: m.pct,
     job: m.job.title,
+    jid: m.job_id,
     st: m.status,
     rev: m.revisions_used,
     at: m.agreed_at,
@@ -91,6 +103,14 @@ export async function loadAll() {
         sb.from("messages").select("*").in("match_id", ids).order("created_at"),
       )
     : [];
+  FU = {};
+  const fps = msgs.map((x) => x.file_path).filter(Boolean);
+  if (fps.length) {
+    const { data } = await sb.storage
+      .from("lampiran")
+      .createSignedUrls(fps, 3600, { download: true });
+    (data || []).forEach((x) => (FU[x.path] = x.signedUrl));
+  }
   const lgs = ids.length
       ? await q(
           sb
@@ -140,21 +160,25 @@ export async function loadAll() {
       .map(mJob)
       .sort((a, b) => pct(b) - pct(a));
   } else {
-    S.myJobs = (
+    S.allJobs = (
       await q(
         sb
           .from("jobs")
           .select("*, employer:employer_profiles(name)")
           .eq("employer_id", S.me)
-          .eq("status", "open"),
+          .order("created_at", { ascending: false }),
       )
     ).map(mJob);
-    const j0 = S.myJobs[0],
-      taken = new Set(
-        all.filter((m) => m.job_id === j0?.id).map((m) => m.worker_id),
-      );
+    S.myJobs = S.allJobs.filter((j) => j.st === "open");
+    S.jm = all.map((m) => ({ j: m.job_id, s: m.status }));
+    S.mk = all.map((m) => m.job_id + "|" + m.worker_id);
+    const mk = new Set(S.mk);
+    /* talenta disembunyikan hanya kalau SEMUA pekerjaan terbukamu sudah diproses dengannya */
     S.ws = (await q(sb.from("worker_profiles").select("*")))
-      .filter((x) => !taken.has(x.user_id))
+      .filter(
+        (x) =>
+          !S.myJobs.length || !S.myJobs.every((j) => mk.has(j.id + "|" + x.user_id)),
+      )
       .map(mWorker)
       .sort((a, b) => pctW(b) - pctW(a));
   }
@@ -178,24 +202,26 @@ export async function sendMsg(id, body) {
 }
 
 /* swipe kanan / tombol Daftar-Undang -> negosiasi baru (belum ada kerja sama sampai KEDUA pihak setuju) */
-export async function createMatch(i) {
+export async function createMatch(i, jobId) {
   const w = S.role === "worker",
     x = (w ? S.jobs : S.ws)[i],
-    job = w ? x : S.myJobs[0];
+    job = w ? x : S.myJobs.find((j) => j.id === jobId);
   if (!x) return false;
   if (!job) {
-    toast("Pasang pekerjaan dulu di tab Profil.");
+    toast("Pilih pekerjaan yang valid dulu di tab Pekerjaan.");
     return false;
   }
-  const { error } = await sb.from("matches").insert({
-    job_id: job.id,
-    worker_id: w ? S.me : x.id,
-    initiated_by: S.role,
-    pct: w ? pct(x) : pctW(x),
-    budget: job.b,
-    days: job.d,
-    max_revisions: job.r,
-  });
+  const { error } = await sb
+    .from("matches")
+    .insert({
+      job_id: job.id,
+      worker_id: w ? S.me : x.id,
+      initiated_by: S.role,
+      pct: w ? pct(x) : pctWJ(x, job),
+      budget: job.b,
+      days: job.d,
+      max_revisions: job.r,
+    });
   if (error) {
     toast(
       error.code === "23505"
@@ -208,7 +234,8 @@ export async function createMatch(i) {
   return true;
 }
 
-export async function postJob() {
+/* tambah ATAU ubah pekerjaan (S.jf.id terisi = mode ubah) */
+export async function saveJob() {
   const f = S.jf,
     t = f.t.trim(),
     x = f.x.trim();
@@ -223,23 +250,109 @@ export async function postJob() {
     return toast("Honor harus antara Rp 15.000 dan Rp 300.000.");
   if (!(f.d >= 1 && f.d <= 60) || !(f.r >= 0 && f.r <= 5))
     return toast("Tenggat 1-60 hari, revisi 0-5.");
-  const { error } = await sb.from("jobs").insert({
-    employer_id: S.me,
-    title: t,
-    description: x,
-    deliverables: f.dv.trim() || null,
-    bidang: f.bd,
-    skills: f.s,
-    level_needed: f.lv,
-    budget: f.b,
-    days: f.d,
-    max_revisions: f.r,
-  });
+  const row = {
+      title: t,
+      description: x,
+      deliverables: f.dv.trim() || null,
+      bidang: f.bd,
+      skills: f.s,
+      level_needed: f.lv,
+      budget: f.b,
+      days: f.d,
+      max_revisions: f.r,
+    },
+    { error } = f.id
+      ? await sb.from("jobs").update(row).eq("id", f.id).eq("employer_id", S.me)
+      : await sb.from("jobs").insert({ employer_id: S.me, ...row });
   if (error) return toast(error.message);
-  Object.assign(S.jf, { t: "", x: "", dv: "", bd: [], s: [] });
+  const edit = !!f.id;
+  Object.assign(S.jf, {
+    id: null,
+    t: "",
+    x: "",
+    dv: "",
+    bd: [],
+    s: [],
+    lv: "Semua level",
+    b: 100000,
+    d: 5,
+    r: 2,
+  });
+  S.jform = false;
   await loadAll();
   R();
-  toast("Pekerjaan dipasang.");
+  scrollTo(0, 0);
+  toast(edit ? "Perubahan disimpan." : "Pekerjaan dipasang.");
+}
+export async function setJobStatus(id, st) {
+  const { error } = await sb
+    .from("jobs")
+    .update({ status: st })
+    .eq("id", id)
+    .eq("employer_id", S.me);
+  if (error) return toast(error.message);
+  await loadAll();
+  R();
+  toast(st === "open" ? "Pekerjaan dibuka lagi." : "Pekerjaan ditutup. Tidak muncul untuk pelamar baru.");
+}
+export async function removeJob(id) {
+  const { error } = await sb
+    .from("jobs")
+    .delete()
+    .eq("id", id)
+    .eq("employer_id", S.me);
+  if (error) return toast(error.message);
+  await loadAll();
+  R();
+  toast("Pekerjaan dihapus.");
+}
+/* detail pekerjaan: pakai yang sudah dimuat, kalau tidak ada ambil dari server */
+export async function getJob(id) {
+  const k = [...S.jobs, ...S.allJobs].find((j) => j.id === id);
+  if (k) return k;
+  const { data, error } = await sb
+    .from("jobs")
+    .select("*, employer:employer_profiles(name)")
+    .eq("id", id)
+    .maybeSingle();
+  return error || !data ? null : mJob(data);
+}
+
+/* lampiran chat (video, Excel, dokumen, dll). Bisa diunduh kedua pihak. */
+export const MAXF = 26214400;
+const BADX = /\.(exe|bat|cmd|msi|apk|sh|jar|scr|com|vbs|ps1|dll)$/i;
+export async function sendFile(id, f, caption) {
+  if (f.size > MAXF) return toast("File maksimal 25 MB."), false;
+  if (BADX.test(f.name)) return toast("Jenis file ini tidak diizinkan."), false;
+  const safe =
+      f.name
+        .normalize("NFKD")
+        .replace(/[^a-zA-Z0-9._-]+/g, "_")
+        .slice(-80) || "berkas",
+    path = id + "/" + Date.now() + "-" + safe,
+    up = await sb.storage
+      .from("lampiran")
+      .upload(path, f, { contentType: f.type || "application/octet-stream" });
+  if (up.error) return toast("Gagal unggah: " + up.error.message), false;
+  const { error } = await sb.from("messages").insert({
+    match_id: id,
+    sender_id: S.me,
+    body: caption || "",
+    is_system: false,
+    file_path: path,
+    file_name: f.name.slice(0, 120),
+    file_size: f.size,
+    file_type: f.type || "",
+  });
+  if (error) {
+    await sb.storage.from("lampiran").remove([path]);
+    return toast(error.message), false;
+  }
+  await sb
+    .from("matches")
+    .update({ [S.role === "worker" ? "employer_unread" : "worker_unread"]: true })
+    .eq("id", id);
+  return true;
 }
 
 const WF = [
@@ -274,13 +387,15 @@ export async function saveProfile() {
   let e;
   if (S.role === "worker") {
     const w = S.w;
-    ({ error: e } = await sb.from("worker_profiles").upsert({
-      user_id: S.me,
-      ...pick(w, WF),
-      jam: +w.jam,
-      min_pay: +w.min,
-      grad_year: +w.grad_year || null,
-    }));
+    ({ error: e } = await sb
+      .from("worker_profiles")
+      .upsert({
+        user_id: S.me,
+        ...pick(w, WF),
+        jam: +w.jam,
+        min_pay: +w.min,
+        grad_year: +w.grad_year || null,
+      }));
   } else
     ({ error: e } = await sb
       .from("employer_profiles")

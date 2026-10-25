@@ -9,6 +9,7 @@ import { vNotif, vChatList, vChat } from "./views/chat.js";
 import { vCoop, vCoopD } from "./views/coop.js";
 import { vMe, vProf } from "./views/profile.js";
 import { vKontrak } from "./views/contract.js";
+import { vJobs, vJob, vInvite } from "./views/jobs.js";
 
 export const go = (s) => {
     S.scr = s;
@@ -27,13 +28,13 @@ export const go = (s) => {
 
 const TABS = (w) => [
   ["home", "search", w ? "Temukan" : "Talenta"],
+  ...(w ? [] : [["jobs", "briefcase", "Pekerjaan"]]),
   ["chat", "chat", "Chat"],
-  ["coop", "briefcase", "Kerja Sama"],
+  ["coop", "contract", "Kerja Sama"],
   ["me", "user", "Profil"],
 ];
 /* tab yang menyala mengikuti halaman yang sedang dibuka */
-const active = () =>
-  ({ chat: "chat", coopd: "coop", kontrak: "coop" })[S.view] || S.tab;
+const active = () => ({ chat: "chat", coopd: "coop", kontrak: "coop" })[S.view] || S.tab;
 const goTab = (k) => `S.tab='${k}';S.view='main';R();scrollTo(0,0)`;
 
 export const hdr = () => {
@@ -49,16 +50,12 @@ export const hdr = () => {
 };
 
 export const nav = () =>
-  `<nav aria-label="Menu utama" class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md lg:inset-y-0 lg:right-auto lg:w-64 lg:border-r lg:border-t-0 lg:bg-card lg:pb-0 lg:pt-7"><div class="hidden px-6 pb-7 lg:block">${LOGO}</div><div class="mx-auto flex max-w-xl justify-around px-2 py-1 lg:max-w-none lg:flex-col lg:justify-start lg:gap-1 lg:px-4 lg:py-0">${TABS(
-    S.role === "worker",
-  )
+  `<nav aria-label="Menu utama" class="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md lg:inset-y-0 lg:right-auto lg:w-64 lg:border-r lg:border-t-0 lg:bg-card lg:pb-0 lg:pt-7"><div class="hidden px-6 pb-7 lg:block">${LOGO}</div><div class="mx-auto flex max-w-xl justify-around px-2 py-1 lg:max-w-none lg:flex-col lg:justify-start lg:gap-1 lg:px-4 lg:py-0">${TABS(S.role === "worker")
     .map(([k, i, l]) => {
       const on = active() === k;
-      return `<button aria-current="${on ? "page" : "false"}" class="flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[11px] font-bold transition lg:min-h-12 lg:flex-none lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:text-sm ${on ? "text-pri lg:bg-soft" : "text-mut hover:text-ink lg:hover:bg-soft/60"}" onclick="${goTab(k)}"><span class="grid h-7 w-14 place-items-center rounded-full transition lg:h-auto lg:w-auto ${on ? "bg-soft lg:bg-transparent" : ""}">${ico(i, "h-[22px] w-[22px]")}</span><span>${l}</span></button>`;
+      return `<button aria-current="${on ? "page" : "false"}" class="flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1.5 text-[10.5px] font-bold whitespace-nowrap transition lg:min-h-12 lg:flex-none lg:flex-row lg:justify-start lg:gap-3 lg:px-4 lg:text-sm ${on ? "text-pri lg:bg-soft" : "text-mut hover:text-ink lg:hover:bg-soft/60"}" onclick="${goTab(k)}"><span class="grid h-7 w-12 place-items-center rounded-full transition lg:h-auto lg:w-auto ${on ? "bg-soft lg:bg-transparent" : ""}">${ico(i, "h-[22px] w-[22px]")}</span><span>${l}</span></button>`;
     })
-    .join(
-      "",
-    )}</div><p class="absolute inset-x-0 bottom-5 hidden px-6 text-xs text-mut lg:block">Prototipe MVP · ${S.role === "worker" ? "Pencari kerja" : "Pemberi kerja"}</p></nav>`;
+    .join("")}</div><p class="absolute inset-x-0 bottom-5 hidden px-6 text-xs text-mut lg:block">Prototipe MVP · ${S.role === "worker" ? "Pencari kerja" : "Pemberi kerja"}</p></nav>`;
 
 /* bar CTA bawah di landing (mobile) baru muncul setelah melewati hero */
 const sticky = () => {
@@ -75,7 +72,7 @@ export function R() {
   else if (s === "onb")
     h = `${HDR(`${LOGO}<span class="text-sm font-semibold text-mut">Lengkapi profil</span>`, "max-w-3xl")}<main class="mx-auto max-w-2xl px-4 pb-16 pt-6 sm:px-6 sm:pt-10">${vOnb()}</main>`;
   else
-    h = `<div class="lg:pl-64">${hdr()}<main class="mx-auto max-w-3xl px-4 pb-28 pt-6 sm:px-6 lg:max-w-4xl lg:pb-12 lg:pt-8">${S.view === "prof" ? vProf() : S.view === "kontrak" ? vKontrak() : S.view === "chat" ? vChat() : S.view === "coopd" ? vCoopD() : { home: vHome, notif: vNotif, chat: vChatList, coop: vCoop, me: vMe }[S.tab]()}</main></div>${nav()}`;
+    h = `<div class="lg:pl-64">${hdr()}<main class="mx-auto max-w-3xl px-4 pb-28 pt-6 sm:px-6 lg:max-w-4xl lg:pb-12 lg:pt-8">${S.view === "prof" ? vProf() : S.view === "job" ? vJob() : S.view === "kontrak" ? vKontrak() : S.view === "chat" ? vChat() : S.view === "coopd" ? vCoopD() : { home: vHome, notif: vNotif, chat: vChatList, coop: vCoop, me: vMe, jobs: vJobs }[S.tab]()}</main></div>${nav()}${S.inv != null ? vInvite() : ""}`;
   $("#app").innerHTML = h;
   sticky();
   const cb = $("#cb");

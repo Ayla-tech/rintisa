@@ -76,6 +76,7 @@ export const fresh = () => ({
     ids: "belum",
   },
   jf: {
+    id: null,
     t: "",
     x: "",
     dv: "",
@@ -90,6 +91,12 @@ export const fresh = () => ({
   jobs: [],
   ws: [],
   myJobs: [],
+  allJobs: [],
+  jm: [],
+  mk: [],
+  jv: null,
+  jform: false,
+  inv: null,
   me: null,
 });
 export const S = fresh();

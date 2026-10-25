@@ -11,6 +11,7 @@ import * as chat from "./views/chat.js";
 import * as coop from "./views/coop.js";
 import * as contract from "./views/contract.js";
 import * as profile from "./views/profile.js";
+import * as jobs from "./views/jobs.js";
 import * as data from "./data.js";
 // template HTML memakai onclick="...", jadi fungsi-fungsinya harus global
 Object.assign(
@@ -26,6 +27,7 @@ Object.assign(
   coop,
   contract,
   profile,
+  jobs,
   data,
 );
 data
